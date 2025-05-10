@@ -7,7 +7,7 @@ export enum TransferEventStatus {
   APPROVED = 'APPROVED',
 }
 
-interface CalendarEvent {
+export interface CalendarEvent {
   summary: string;
   description: string;
   location: string;
@@ -37,3 +37,4 @@ export async function transferEventToApprovedCalendar(eventId: string): Promise<
 // 1. Set up OAuth2 authentication with Google API
 // 2. Create a backend service to handle these API calls securely
 // 3. Store your API keys securely in environment variables or a secret manager
+

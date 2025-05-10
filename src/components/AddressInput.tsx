@@ -42,14 +42,12 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
   useEffect(() => {
     if (isScriptLoaded && autoCompleteRef.current) {
       try {
-        // For TypeScript support - window.google would be defined after script is loaded
-        const google = window.google;
-        if (!google) {
+        if (!window.google) {
           console.error('Google Maps API not loaded');
           return;
         }
 
-        const autocomplete = new google.maps.places.Autocomplete(
+        const autocomplete = new window.google.maps.places.Autocomplete(
           autoCompleteRef.current,
           { types: ['address'], componentRestrictions: { country: 'be' } }
         );
