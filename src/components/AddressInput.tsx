@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
 
 // Define the interface for address data
 export interface AddressData {
@@ -20,9 +21,14 @@ interface AddressInputProps {
   value: string;
 }
 
+// We can define a constant for the API key, which makes it easier to replace in a CI/CD pipeline
+// You should still restrict this key in the Google Cloud Console
+const GOOGLE_MAPS_API_KEY = 'YOUR_ACTUAL_API_KEY'; 
+
 const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) => {
   const autoCompleteRef = useRef<HTMLInputElement>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [scriptError, setScriptError] = useState<string | null>(null);
 
   // Load Google Maps script
   useEffect(() => {
@@ -33,11 +39,24 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
     }
 
     const googleMapScript = document.createElement('script');
-    // Replace this with your actual Google Maps API key
-    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_ACTUAL_API_KEY&libraries=places`;
+    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
     googleMapScript.async = true;
     googleMapScript.defer = true;
-    googleMapScript.onload = () => setIsScriptLoaded(true);
+    
+    googleMapScript.onload = () => {
+      setIsScriptLoaded(true);
+      setScriptError(null);
+    };
+    
+    googleMapScript.onerror = () => {
+      setScriptError('De Google Maps API kon niet worden geladen. Controleer uw API-sleutel.');
+      toast({
+        title: "API fout",
+        description: "Er was een probleem met het laden van adressuggesties.",
+        variant: "destructive",
+      });
+    };
+    
     document.body.appendChild(googleMapScript);
 
     return () => {
@@ -114,6 +133,7 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
         });
       } catch (error) {
         console.error('Error initializing Google Maps Autocomplete:', error);
+        setScriptError('Er is een fout opgetreden bij het initialiseren van adressuggesties.');
       }
     }
   }, [isScriptLoaded, onAddressSelect]);
@@ -129,8 +149,11 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
         value={value}
         onChange={(e) => onAddressSelect({ fullAddress: e.target.value })}
       />
-      {!isScriptLoaded && (
+      {!isScriptLoaded && !scriptError && (
         <p className="text-xs text-muted-foreground">Adres suggesties worden geladen...</p>
+      )}
+      {scriptError && (
+        <p className="text-xs text-destructive">{scriptError}</p>
       )}
       <p className="text-xs text-muted-foreground">
         Vul een volledig adres in waar de tent geleverd moet worden
