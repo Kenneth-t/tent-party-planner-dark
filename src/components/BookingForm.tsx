@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import TentConfigurator, { TentOption } from './TentConfigurator';
 import DateTimePicker from './DateTimePicker';
@@ -10,7 +9,7 @@ import { createCalendarEvent, TransferEventStatus } from '@/lib/googleCalendar';
 import { sendBookingEmail } from '@/lib/emailService';
 import { useToast } from '@/hooks/use-toast';
 
-// Define tent options
+// Tent options
 const tentOptions: TentOption[] = [
   {
     id: 'basic',
@@ -45,6 +44,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string>('12:00');
   const [address, setAddress] = useState<AddressData>({ fullAddress: '' });
+  const [deliveryCost, setDeliveryCost] = useState<number>(0);
   const [comments, setComments] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [name, setName] = useState<string>('');
@@ -52,13 +52,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Handle tent selection
   const handleTentChange = (tent: TentOption) => {
     setSelectedTent(tent);
     onTentSelect(tent.id as 'basic' | 'full');
   };
 
-  // Handle submit
   const handleSubmit = async () => {
     if (!selectedDate || !address.fullAddress || !email || !name) {
       toast({
@@ -72,37 +70,26 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
     setIsSubmitting(true);
 
     try {
-      // Create event in "Bookings to approve" calendar
+      const fullAddress = `${address.street || ''} ${address.houseNumber || ''}, ${address.postalCode || ''} ${address.city || ''}, ${address.country || ''}`.trim();
+      const total = selectedTent.price + deliveryCost;
+
+      // Create calendar event (blocks 2 days)
       const eventId = await createCalendarEvent({
-        summary: `Feesttent reservering - ${name}`,
-        description: `
-          Tent type: ${selectedTent.name}
-          Klant: ${name}
-          Email: ${email}
-          Telefoon: ${phone}
-          Adres: ${address.fullAddress}
-          Opmerkingen: ${comments || 'Geen'}
-        `,
-        location: address.fullAddress,
-        startDateTime: new Date(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate(),
-          parseInt(selectedTime.split(':')[0]),
-          parseInt(selectedTime.split(':')[1])
-        ),
-        // End date is 24 hours later
-        endDateTime: new Date(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth(),
-          selectedDate.getDate() + 1,
-          parseInt(selectedTime.split(':')[0]),
-          parseInt(selectedTime.split(':')[1])
-        ),
+        customerName: name,
+        customerEmail: email,
+        customerPhone: phone,
+        tentType: selectedTent.name,
+        price: selectedTent.price,
+        deliveryCost,
+        total,
+        date: selectedDate,
+        time: selectedTime,
+        address,
+        comments,
         status: TransferEventStatus.TO_APPROVE
       });
 
-      // Send email with booking request
+      // Send confirmation email to admin (or customer)
       await sendBookingEmail({
         to: "feestindetentverhuur@gmail.com",
         subject: `Nieuwe feesttent reservering - ${name}`,
@@ -126,6 +113,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
       // Reset form
       setSelectedDate(undefined);
       setAddress({ fullAddress: '' });
+      setDeliveryCost(0);
       setComments('');
       setEmail('');
       setName('');
@@ -203,7 +191,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
       </div>
       
       <AddressInput 
-        onAddressSelect={(addressData) => setAddress(addressData)} 
+        onAddressSelect={(addressData, cost) => {
+          setAddress(addressData);
+          setDeliveryCost(cost);
+        }} 
         value={address.fullAddress}
       />
       
@@ -224,6 +215,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
         selectedTime={selectedTime}
         address={address.fullAddress}
         comments={comments}
+        deliveryCost={deliveryCost}
         onSubmit={handleSubmit}
         isSubmitting={isSubmitting}
       />

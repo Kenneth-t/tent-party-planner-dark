@@ -1,6 +1,5 @@
-
-import React from 'react';
-import { format, addDays, addHours } from 'date-fns';
+import React, { useEffect, useState } from 'react';
+import { format, addHours, isBefore, isSameDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -17,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CalendarIcon, Clock } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface DateTimePickerProps {
   selectedDate: Date | undefined;
@@ -30,12 +30,18 @@ const timeSlots = [
   "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
 ];
 
+// Replace these with your actual keys
+const GOOGLE_API_KEY = 'AIzaSyBcqwNV52-uiN1p62Qcb6U3eu3CEKs2UIw';
+const CALENDAR_ID = '230a68d8aeabc94b901e673f4165ba60fb56a79d51e9cd879384bfb1cbe384c7@group.calendar.google.com';
+
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
   selectedDate,
   selectedTime,
   onDateChange,
   onTimeChange,
 }) => {
+  const [bookedDates, setBookedDates] = useState<Date[]>([]);
+
   const getFormattedDate = (date: Date | undefined) => {
     if (!date) return "Selecteer een datum";
     return format(date, "dd-MM-yyyy", { locale: nl });
@@ -43,20 +49,81 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const getPickupDateTime = (date: Date | undefined, timeString: string) => {
     if (!date) return null;
-    
-    // Parse the selected time
     const [hours, minutes] = timeString.split(':').map(Number);
-    
-    // Create a new date with the selected date and time
     const selectedDateTime = new Date(date);
     selectedDateTime.setHours(hours, minutes);
-    
-    // Add 24 hours to get the pickup time
     return addHours(selectedDateTime, 24);
   };
 
   const pickupDateTime = getPickupDateTime(selectedDate, selectedTime);
-  
+
+  // Fetch booked dates from Google Calendar
+  useEffect(() => {
+    const fetchBookedDates = async () => {
+      const now = new Date().toISOString();
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${CALENDAR_ID}/events?key=${GOOGLE_API_KEY}&timeMin=${now}&singleEvents=true&orderBy=startTime`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const parsed = data.items
+          .map((event: any) => event.start?.date || event.start?.dateTime)
+          .filter(Boolean)
+          .map((dateStr: string) => new Date(dateStr));
+
+        setBookedDates(parsed);
+
+        // Default to today unless it's booked or in the past
+        const today = new Date();
+        const isTodayAvailable = !parsed.some(d => isSameDay(d, today)) && !isBefore(today, new Date());
+        const fallback = getNextAvailableDate(parsed);
+        onDateChange(isTodayAvailable ? today : fallback);
+
+      } catch (err) {
+        console.error("Failed to fetch calendar events", err);
+        toast({
+          title: "Fout bij het laden van agenda",
+          description: "Beschikbare datums konden niet worden opgehaald.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchBookedDates();
+  }, []);
+
+  // Utility: find first non-booked date from today onward
+  const getNextAvailableDate = (booked: Date[]): Date => {
+    const d = new Date();
+    for (let i = 0; i < 365; i++) {
+      if (
+        !booked.some(b => isSameDay(b, d)) &&
+        !isBefore(d, new Date())
+      ) return new Date(d);
+      d.setDate(d.getDate() + 1);
+    }
+    return new Date(); // fallback
+  };
+
+  const handleDateChange = (date: Date | undefined) => {
+    if (!date) return;
+    const isBlocked = bookedDates.some(d => isSameDay(d, date)) || isBefore(date, new Date().setHours(0, 0, 0, 0));
+    if (isBlocked) {
+      toast({
+        title: "Datum niet beschikbaar",
+        description: "Deze datum is al geboekt.",
+        variant: "destructive"
+      });
+      return;
+    }
+    onDateChange(date);
+  };
+
+  const disableDates = (date: Date) =>
+    isBefore(date, new Date().setHours(0, 0, 0, 0)) ||
+    bookedDates.some(d => isSameDay(d, date));
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Kies datum & tijd</h2>
@@ -81,8 +148,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
               <Calendar
                 mode="single"
                 selected={selectedDate}
-                onSelect={onDateChange}
-                disabled={(date) => date < new Date()}
+                onSelect={handleDateChange}
+                disabled={disableDates}
                 initialFocus
                 className="p-3 pointer-events-auto"
                 locale={nl}

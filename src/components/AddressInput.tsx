@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,21 +16,24 @@ export interface AddressData {
 }
 
 interface AddressInputProps {
-  onAddressSelect: (address: AddressData) => void;
+  onAddressSelect: (address: AddressData, deliveryCost: number) => void;
   value: string;
 }
 
-// API key with domain and API restrictions applied for security
+// Constants for delivery logic
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCxrJf7q9nTRjJBEOf9vuK2-8HV9L1GCTY'; 
+const ORIGIN = 'Lokeren, Belgium';
+const FREE_KM = 30;
+const COST_PER_KM = 0.35;
 
 const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) => {
   const autoCompleteRef = useRef<HTMLInputElement>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const [deliveryCost, setDeliveryCost] = useState<number | null>(null);
 
   // Load Google Maps script
   useEffect(() => {
-    // Check if script is already in the document
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
     if (existingScript) {
       document.body.removeChild(existingScript);
@@ -128,7 +130,28 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
             longitude: place.geometry?.location?.lng(),
           };
 
-          onAddressSelect(addressData);
+          const service = new window.google.maps.DistanceMatrixService();
+          service.getDistanceMatrix(
+            {
+              origins: [ORIGIN],
+              destinations: [addressData.fullAddress],
+              travelMode: window.google.maps.TravelMode.DRIVING,
+            },
+            (response, status) => {
+              if (status === 'OK') {
+                const meters = response.rows[0].elements[0].distance.value;
+                const km = meters / 1000;
+                const extra = Math.max(0, km - FREE_KM);
+                const cost = parseFloat((extra * COST_PER_KM).toFixed(2));
+                setDeliveryCost(cost);
+                onAddressSelect(addressData, cost); // ✅ Updated here
+              } else {
+                console.warn('DistanceMatrix failed:', status);
+                setDeliveryCost(null);
+                onAddressSelect(addressData, 0); // fallback
+              }
+            }
+          );
         });
       } catch (error) {
         console.error('Error initializing Google Maps Autocomplete:', error);
@@ -140,13 +163,14 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
   return (
     <div className="space-y-2">
       <Label htmlFor="address">Leveradres</Label>
+      <span>Eerste 30km gratis, dan €0,35 per bijkomende km</span>
       <Input
         ref={autoCompleteRef}
         id="address"
         type="text"
         placeholder="Begin met typen voor suggesties..."
         value={value}
-        onChange={(e) => onAddressSelect({ fullAddress: e.target.value })}
+        onChange={(e) => onAddressSelect({ fullAddress: e.target.value }, 0)}
       />
       {!isScriptLoaded && !scriptError && (
         <p className="text-xs text-muted-foreground">Adres suggesties worden geladen...</p>
@@ -154,8 +178,15 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
       {scriptError && (
         <p className="text-xs text-destructive">{scriptError}</p>
       )}
+      {deliveryCost !== null && (
+        <p className="text-sm text-gray-600">
+          {deliveryCost === 0
+            ? 'Gratis levering'
+            : `Leveringskost € ${deliveryCost.toFixed(2)}. De eerste 30km rond Lokeren zijn gratis, daarna betaal je € 0,35 per extra km.`}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">
-        Vul een volledig adres in waar de tent geleverd moet worden
+        Vul een volledig adres in waar de tent geleverd moet worden om je leveringskost te berekenen.
       </p>
     </div>
   );

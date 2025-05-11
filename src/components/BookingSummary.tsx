@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TentOption } from './TentConfigurator';
 import { format } from 'date-fns';
@@ -12,6 +11,7 @@ interface BookingSummaryProps {
   selectedTime: string;
   address: string;
   comments: string;
+  deliveryCost: number;
   onSubmit: () => void;
   isSubmitting: boolean;
 }
@@ -22,11 +22,12 @@ const BookingSummary: React.FC<BookingSummaryProps> = ({
   selectedTime,
   address,
   comments,
+  deliveryCost,
   onSubmit,
   isSubmitting
 }) => {
-  // Check if all required fields are filled
   const isFormComplete = !!selectedDate && !!selectedTime && !!address;
+  const total = tentOption.price + deliveryCost;
 
   return (
     <div className="space-y-6">
@@ -66,12 +67,28 @@ const BookingSummary: React.FC<BookingSummaryProps> = ({
               <p className="text-sm mt-1 bg-background/50 rounded p-2">{comments}</p>
             </div>
           )}
-          
+
           <div className="border-t border-gray-700 my-4"></div>
-          
+
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Basisprijs</span>
+            <span>€{tentOption.price.toFixed(2)}</span>
+          </div>
+
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Leveringskost</span>
+            <span>
+              {deliveryCost === 0
+                ? "Gratis"
+                : `€${deliveryCost.toFixed(2)} (eerste 30 km gratis)`}
+            </span>
+          </div>
+
+          <div className="border-t border-gray-700 my-4"></div>
+
           <div className="flex justify-between text-lg">
             <span>Totaal</span>
-            <span className="font-bold text-party-light">€{tentOption.price}</span>
+            <span className="font-bold text-party-light">€{total.toFixed(2)}</span>
           </div>
         </div>
       </div>
