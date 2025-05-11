@@ -27,7 +27,7 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
   // Load Google Maps script
   useEffect(() => {
     const googleMapScript = document.createElement('script');
-    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places`;
+    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places`;
     googleMapScript.async = true;
     googleMapScript.defer = true;
     googleMapScript.onload = () => setIsScriptLoaded(true);
