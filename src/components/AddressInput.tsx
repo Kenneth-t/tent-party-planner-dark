@@ -21,9 +21,8 @@ interface AddressInputProps {
   value: string;
 }
 
-// We can define a constant for the API key, which makes it easier to replace in a CI/CD pipeline
-// You should still restrict this key in the Google Cloud Console
-const GOOGLE_MAPS_API_KEY = 'YOUR_ACTUAL_API_KEY'; 
+// API key with domain and API restrictions applied for security
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCxrJf7q9nTRjJBEOf9vuK2-8HV9L1GCTY'; 
 
 const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) => {
   const autoCompleteRef = useRef<HTMLInputElement>(null);
