@@ -26,15 +26,25 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
 
   // Load Google Maps script
   useEffect(() => {
+    // Check if script is already in the document
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      document.body.removeChild(existingScript);
+    }
+
     const googleMapScript = document.createElement('script');
-    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places`;
+    // Replace this with your actual Google Maps API key
+    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_ACTUAL_API_KEY&libraries=places`;
     googleMapScript.async = true;
     googleMapScript.defer = true;
     googleMapScript.onload = () => setIsScriptLoaded(true);
     document.body.appendChild(googleMapScript);
 
     return () => {
-      document.body.removeChild(googleMapScript);
+      const scriptToRemove = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (scriptToRemove && scriptToRemove.parentNode) {
+        scriptToRemove.parentNode.removeChild(scriptToRemove);
+      }
     };
   }, []);
 
