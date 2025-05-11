@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
 
 // Define the interface for address data
 export interface AddressData {
@@ -20,21 +21,48 @@ interface AddressInputProps {
   value: string;
 }
 
+// API key with domain and API restrictions applied for security
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCxrJf7q9nTRjJBEOf9vuK2-8HV9L1GCTY'; 
+
 const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) => {
   const autoCompleteRef = useRef<HTMLInputElement>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [scriptError, setScriptError] = useState<string | null>(null);
 
   // Load Google Maps script
   useEffect(() => {
+    // Check if script is already in the document
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      document.body.removeChild(existingScript);
+    }
+
     const googleMapScript = document.createElement('script');
-    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places`;
+    googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
     googleMapScript.async = true;
     googleMapScript.defer = true;
-    googleMapScript.onload = () => setIsScriptLoaded(true);
+    
+    googleMapScript.onload = () => {
+      setIsScriptLoaded(true);
+      setScriptError(null);
+    };
+    
+    googleMapScript.onerror = () => {
+      setScriptError('De Google Maps API kon niet worden geladen. Controleer uw API-sleutel.');
+      toast({
+        title: "API fout",
+        description: "Er was een probleem met het laden van adressuggesties.",
+        variant: "destructive",
+      });
+    };
+    
     document.body.appendChild(googleMapScript);
 
     return () => {
-      document.body.removeChild(googleMapScript);
+      const scriptToRemove = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (scriptToRemove && scriptToRemove.parentNode) {
+        scriptToRemove.parentNode.removeChild(scriptToRemove);
+      }
     };
   }, []);
 
@@ -104,6 +132,7 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
         });
       } catch (error) {
         console.error('Error initializing Google Maps Autocomplete:', error);
+        setScriptError('Er is een fout opgetreden bij het initialiseren van adressuggesties.');
       }
     }
   }, [isScriptLoaded, onAddressSelect]);
@@ -119,8 +148,11 @@ const AddressInput: React.FC<AddressInputProps> = ({ onAddressSelect, value }) =
         value={value}
         onChange={(e) => onAddressSelect({ fullAddress: e.target.value })}
       />
-      {!isScriptLoaded && (
+      {!isScriptLoaded && !scriptError && (
         <p className="text-xs text-muted-foreground">Adres suggesties worden geladen...</p>
+      )}
+      {scriptError && (
+        <p className="text-xs text-destructive">{scriptError}</p>
       )}
       <p className="text-xs text-muted-foreground">
         Vul een volledig adres in waar de tent geleverd moet worden
