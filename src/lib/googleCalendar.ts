@@ -1,6 +1,5 @@
-
-// This file would typically integrate with actual Google Calendar API
-// For now, we'll create a placeholder that would be replaced with real implementation
+import { google } from 'googleapis';
+import { format } from 'date-fns';
 
 export enum TransferEventStatus {
   TO_APPROVE = 'TO_APPROVE',
@@ -17,24 +16,43 @@ export interface CalendarEvent {
 }
 
 export async function createCalendarEvent(eventDetails: CalendarEvent): Promise<string> {
-  // In a real implementation, this would create an event in the "Bookings to approve" Google Calendar
-  console.log('Creating calendar event:', eventDetails);
-  
-  // This would normally make an API call to Google Calendar
-  // For now, we'll just return a mock event ID
-  return `event_${Math.random().toString(36).substring(2, 11)}`;
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!);
+  console.log("this is the key:" + credentials);
+
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: ['https://www.googleapis.com/auth/calendar'],
+  });
+
+  const calendar = google.calendar({ version: 'v3', auth });
+
+  const calendarId = '230a68d8aeabc94b901e673f4165ba60fb56a79d51e9cd879384bfb1cbe384c7@group.calendar.google.com';
+
+  const event = {
+    summary: eventDetails.summary,
+    description: eventDetails.description,
+    location: eventDetails.location,
+    start: {
+      dateTime: eventDetails.startDateTime.toISOString(),
+      timeZone: 'Europe/Brussels',
+    },
+    end: {
+      dateTime: eventDetails.endDateTime.toISOString(),
+      timeZone: 'Europe/Brussels',
+    },
+  };
+
+  try {
+    const response = await calendar.events.insert({
+      calendarId,
+      requestBody: event,
+    });
+
+    console.log("✅ Event created:", response.data.id);
+    return response.data.id!;
+  } catch (error) {
+    console.error("❌ Failed to create calendar event:", error);
+    throw error;
+  }
 }
-
-export async function transferEventToApprovedCalendar(eventId: string): Promise<boolean> {
-  // In a real implementation, this would transfer the event from "Bookings to approve" to "Approved bookings" calendar
-  console.log('Transferring event to approved calendar:', eventId);
-  
-  // This would normally make an API call to Google Calendar to move the event
-  return true;
-}
-
-// Note: To implement this functionality properly, you would need to:
-// 1. Set up OAuth2 authentication with Google API
-// 2. Create a backend service to handle these API calls securely
-// 3. Store your API keys securely in environment variables or a secret manager
-

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+feest-in-de-tent-41ceb56d050c.json
+.env
+# Local Netlify folder
+.netlify

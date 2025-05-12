@@ -5,11 +5,9 @@ import AddressInput, { AddressData } from './AddressInput';
 import BookingSummary from './BookingSummary';
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { createCalendarEvent, TransferEventStatus } from '@/lib/googleCalendar';
 import { sendBookingEmail } from '@/lib/emailService';
 import { useToast } from '@/hooks/use-toast';
 
-// Tent options
 const tentOptions: TentOption[] = [
   {
     id: 'basic',
@@ -70,26 +68,35 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
     setIsSubmitting(true);
 
     try {
-      const fullAddress = `${address.street || ''} ${address.houseNumber || ''}, ${address.postalCode || ''} ${address.city || ''}, ${address.country || ''}`.trim();
       const total = selectedTent.price + deliveryCost;
 
-      // Create calendar event (blocks 2 days)
-      const eventId = await createCalendarEvent({
-        customerName: name,
-        customerEmail: email,
-        customerPhone: phone,
-        tentType: selectedTent.name,
-        price: selectedTent.price,
-        deliveryCost,
-        total,
-        date: selectedDate,
-        time: selectedTime,
-        address,
-        comments,
-        status: TransferEventStatus.TO_APPROVE
+      // ✅ Call Netlify function to create calendar event
+      const calendarRes = await fetch('/.netlify/functions/createCalendarEvent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: name,
+          customerEmail: email,
+          customerPhone: phone,
+          tentType: selectedTent.name,
+          price: selectedTent.price,
+          deliveryCost,
+          total,
+          date: selectedDate,
+          time: selectedTime,
+          address,
+          comments,
+          status: 'TO_APPROVE'
+        }),
       });
 
-      // Send confirmation email to admin (or customer)
+      if (!calendarRes.ok) {
+        throw new Error("Maken van Google Calendar-event mislukt.");
+      }
+
+      const { eventId } = await calendarRes.json();
+
+      // ✅ Send admin confirmation email
       await sendBookingEmail({
         to: "feestindetentverhuur@gmail.com",
         subject: `Nieuwe feesttent reservering - ${name}`,
@@ -119,7 +126,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onTentSelect }) => {
       setName('');
       setPhone('');
     } catch (error) {
-      console.error('Error submitting booking:', error);
+      console.error('❌ Fout bij verzenden reservering:', error);
       toast({
         title: "Er is iets misgegaan",
         description: "Probeer het later opnieuw of neem contact met ons op.",
