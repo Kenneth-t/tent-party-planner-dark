@@ -30,6 +30,41 @@ declare global {
             };
           };
         };
+        DistanceMatrixService: new () => {
+          getDistanceMatrix: (
+            request: {
+              origins: string[];
+              destinations: string[];
+              travelMode: google.maps.TravelMode;
+            },
+            callback: (
+              response: {
+                rows: {
+                  elements: {
+                    distance: {
+                      text: string;
+                      value: number;
+                    };
+                    duration: {
+                      text: string;
+                      value: number;
+                    };
+                    status: string;
+                  }[];
+                }[];
+                originAddresses: string[];
+                destinationAddresses: string[];
+              },
+              status: string
+            ) => void
+          ) => void;
+        };
+        TravelMode: {
+          DRIVING: string;
+          BICYCLING: string;
+          TRANSIT: string;
+          WALKING: string;
+        };
       };
     };
   }

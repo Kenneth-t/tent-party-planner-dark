@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { format, addHours, isBefore, isSameDay } from 'date-fns';
+import { format, addHours, isBefore, isSameDay, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -56,28 +55,36 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const pickupDateTime = getPickupDateTime(selectedDate, selectedTime);
 
-  // Fetch booked dates using a serverless function
+  // Fetch booked dates using our serverless function
   useEffect(() => {
     const fetchBookedDates = async () => {
       setIsLoading(true);
       try {
-        // Instead of direct API call, we'll mock the response for now
-        // In production, this would call a serverless function
+        // Get current month and year
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
         
-        // Mock data - in real implementation replace with actual API call to your serverless function
-        const mockBookedDates = [
-          new Date(2025, 4, 15), // May 15, 2025
-          new Date(2025, 4, 20), // May 20, 2025
-          new Date(2025, 4, 21), // May 21, 2025
-          new Date(2025, 4, 25), // May 25, 2025
-        ];
+        // Call our serverless function
+        const response = await fetch(`/.netlify/functions/getAvailability?month=${currentMonth}&year=${currentYear}`);
         
-        setBookedDates(mockBookedDates);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Convert string dates to Date objects
+        const parsedBookedDates = (data.bookedDates || []).map((dateStr: string) => parseISO(dateStr));
+        
+        setBookedDates(parsedBookedDates);
         
         // Default to today unless it's booked or in the past
         const today = new Date();
-        const isTodayAvailable = !mockBookedDates.some(d => isSameDay(d, today)) && !isBefore(today, new Date().setHours(0, 0, 0, 0));
-        const fallback = getNextAvailableDate(mockBookedDates);
+        const isTodayAvailable = !parsedBookedDates.some(d => isSameDay(d, today)) && 
+                                 !isBefore(today, new Date().setHours(0, 0, 0, 0));
+                                 
+        const fallback = getNextAvailableDate(parsedBookedDates);
         onDateChange(isTodayAvailable ? today : fallback);
 
       } catch (err) {
@@ -97,7 +104,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     };
 
     fetchBookedDates();
-  }, []);
+  }, [onDateChange]);
 
   // Utility: find first non-booked date from today onward
   const getNextAvailableDate = (booked: Date[]): Date => {
