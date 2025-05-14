@@ -22,8 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+escaped-key.txt
 
 feest-in-de-tent-41ceb56d050c.json
 .env
 # Local Netlify folder
 .netlify
+
+generate-google-api-credentials.js

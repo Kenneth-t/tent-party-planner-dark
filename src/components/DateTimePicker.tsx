@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format, addHours, isBefore, isSameDay } from 'date-fns';
+import { format, addHours, isBefore, isSameDay, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -30,10 +30,7 @@ const timeSlots = [
   "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
 ];
 
-// Replace these with your actual keys
-const GOOGLE_API_KEY = 'AIzaSyBcqwNV52-uiN1p62Qcb6U3eu3CEKs2UIw';
-const CALENDAR_ID = '230a68d8aeabc94b901e673f4165ba60fb56a79d51e9cd879384bfb1cbe384c7@group.calendar.google.com';
-
+// We'll use a serverless function to fetch the calendar data instead of client-side API key
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
   selectedDate,
   selectedTime,
@@ -41,6 +38,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   onTimeChange,
 }) => {
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const getFormattedDate = (date: Date | undefined) => {
     if (!date) return "Selecteer een datum";
@@ -57,41 +55,56 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const pickupDateTime = getPickupDateTime(selectedDate, selectedTime);
 
-  // Fetch booked dates from Google Calendar
+  // Fetch booked dates using our serverless function
   useEffect(() => {
     const fetchBookedDates = async () => {
-      const now = new Date().toISOString();
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${CALENDAR_ID}/events?key=${GOOGLE_API_KEY}&timeMin=${now}&singleEvents=true&orderBy=startTime`;
-
+      setIsLoading(true);
       try {
-        const res = await fetch(url);
-        const data = await res.json();
-
-        const parsed = data.items
-          .map((event: any) => event.start?.date || event.start?.dateTime)
-          .filter(Boolean)
-          .map((dateStr: string) => new Date(dateStr));
-
-        setBookedDates(parsed);
-
+        // Get current month and year
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        // Call our serverless function
+        const response = await fetch(`/.netlify/functions/getAvailability?month=${currentMonth}&year=${currentYear}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Convert string dates to Date objects
+        const parsedBookedDates = (data.bookedDates || []).map((dateStr: string) => parseISO(dateStr));
+        
+        setBookedDates(parsedBookedDates);
+        
         // Default to today unless it's booked or in the past
         const today = new Date();
-        const isTodayAvailable = !parsed.some(d => isSameDay(d, today)) && !isBefore(today, new Date());
-        const fallback = getNextAvailableDate(parsed);
+        const isTodayAvailable = !parsedBookedDates.some(d => isSameDay(d, today)) && 
+                                 !isBefore(today, new Date().setHours(0, 0, 0, 0));
+                                 
+        const fallback = getNextAvailableDate(parsedBookedDates);
         onDateChange(isTodayAvailable ? today : fallback);
 
       } catch (err) {
         console.error("Failed to fetch calendar events", err);
         toast({
           title: "Fout bij het laden van agenda",
-          description: "Beschikbare datums konden niet worden opgehaald.",
+          description: "Beschikbare datums konden niet worden opgehaald. We tonen alle dagen als beschikbaar.",
           variant: "destructive"
         });
+        
+        // If there's an error, we'll just show all dates as available
+        setBookedDates([]);
+        onDateChange(new Date());
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchBookedDates();
-  }, []);
+  }, [onDateChange]);
 
   // Utility: find first non-booked date from today onward
   const getNextAvailableDate = (booked: Date[]): Date => {
@@ -99,7 +112,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     for (let i = 0; i < 365; i++) {
       if (
         !booked.some(b => isSameDay(b, d)) &&
-        !isBefore(d, new Date())
+        !isBefore(d, new Date().setHours(0, 0, 0, 0))
       ) return new Date(d);
       d.setDate(d.getDate() + 1);
     }
@@ -139,9 +152,19 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                 variant="outline"
                 id="date"
                 className="w-full justify-start text-left font-normal h-12"
+                disabled={isLoading}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? getFormattedDate(selectedDate) : "Kies een datum"}
+                {isLoading ? (
+                  <span className="flex items-center">
+                    <span className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                    Laden...
+                  </span>
+                ) : (
+                  <>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? getFormattedDate(selectedDate) : "Kies een datum"}
+                  </>
+                )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
