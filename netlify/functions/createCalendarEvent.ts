@@ -1,9 +1,8 @@
-// netlify/functions/createCalendarEvent.ts
-import { Handler } from '@netlify/functions';
-import { google } from 'googleapis';
-import { format } from 'date-fns';
+const { google } = require('googleapis');
+const { format } = require('date-fns');
 
-const handler: Handler = async (event) => {
+/** @type {import('@netlify/functions').Handler} */
+const handler = async (event) => {
   try {
     const data = JSON.parse(event.body || '{}');
 
@@ -25,7 +24,7 @@ const handler: Handler = async (event) => {
     // ✅ Build credentials from individual env vars
     const credentials = {
       type: 'service_account',
-      project_id: 'feest-in-de-tent', // optional: make env var too
+      project_id: 'feest-in-de-tent',
       private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
       private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -39,16 +38,16 @@ const handler: Handler = async (event) => {
 
     // ✅ Authenticate with Google
     const auth = new google.auth.JWT(
-      credentials.client_email!,
-      undefined,
-      credentials.private_key!,
+      credentials.client_email,
+      null,
+      credentials.private_key,
       ['https://www.googleapis.com/auth/calendar']
     );
 
     const calendar = google.calendar({ version: 'v3', auth });
 
     // ✅ Format fields for the event
-    const calendarId = process.env.GOOGLE_CLIENT_ID; // replace this!
+    const calendarId = '230a68d8aeabc94b901e673f4165ba60fb56a79d51e9cd879384bfb1cbe384c7@group.calendar.google.com';
     const fullAddress = `${address.street || ''} ${address.houseNumber || ''}, ${address.postalCode || ''} ${address.city || ''}, ${address.country || ''}`.trim();
     const startDate = new Date(date);
     const endDate = new Date(date);
@@ -85,13 +84,16 @@ Status: ${status}
       statusCode: 200,
       body: JSON.stringify({ eventId: response.data.id }),
     };
-  } catch (err: any) {
+  } catch (err) {
     console.error("❌ Google Calendar insert error:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to create calendar event', details: err.message }),
+      body: JSON.stringify({
+        error: 'Failed to create calendar event',
+        details: err.message || String(err)
+      }),
     };
   }
 };
 
-export { handler };
+module.exports = { handler };
